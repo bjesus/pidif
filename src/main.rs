@@ -1,8 +1,8 @@
 use cairo::Context;
 use gio::ApplicationFlags;
 use glib::clone;
-use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, DrawingArea, Label};
+use gtk4::prelude::*;
+use gtk4::{Application, ApplicationWindow, DrawingArea, Label};
 use poppler::PopplerDocument;
 use std::cell::RefCell;
 use std::env;
@@ -18,10 +18,6 @@ fn main() {
         .flags(ApplicationFlags::HANDLES_OPEN | ApplicationFlags::HANDLES_COMMAND_LINE)
         .build();
 
-    // Connect to "activate" signal of `app`
-    // app.connect_activate(|app| build_ui(app, None));
-
-    // app.connect_open(move |app, files, _| build_ui(app, Some(&files[0])));
     app.connect_command_line(move |app, cmdline| {
         build_ui(&app, cmdline.arguments());
         0
@@ -36,112 +32,119 @@ fn build_ui(app: &Application, arguments: Vec<OsString>) {
         .get(1)
         .and_then(|arg| arg.clone().into_string().ok())
         .unwrap();
-    // Create a button with label and margins
-    let button = Button::builder()
-        .label("load file")
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
+
+    let open_file_button = gtk4::Button::from_icon_name("document-open");
 
     let page_indicator = Label::builder().label("Counting").build();
-    let back_button = Button::builder().label("Back").build();
-    let next_button = Button::builder().label("Next").build();
 
-    let pagew = DrawingArea::builder()
+    let drawing_area = DrawingArea::builder()
         .width_request(100)
         .height_request(100)
         .hexpand(true)
         .vexpand(true)
         .build();
 
-    // Connect to "clicked" signal of `button`
-    button.connect_clicked(move |button| {
-        // Set the label to "Hello World!" after the button has been clicked on
-        button.set_label("Hello World!");
-    });
-
-    let mb = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
+    let app_wrapper = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
         .build();
 
-    let buttom_bar = gtk::Box::builder()
-        .hexpand_set(true)
-        // .orientation(gtk::Orientation::Vertical)
-        .build();
+    let bottom_bar = gtk4::Box::builder().hexpand_set(true).build();
 
-    buttom_bar.append(&back_button);
-    buttom_bar.append(&page_indicator);
-    buttom_bar.append(&next_button);
+    bottom_bar.append(&page_indicator);
 
-    mb.append(&button);
-    mb.append(&pagew);
-    mb.append(&buttom_bar);
+    let header_bar = gtk4::HeaderBar::builder().build();
 
-    // Create a window
+    header_bar.pack_start(&open_file_button);
+    app_wrapper.append(&drawing_area);
+    app_wrapper.append(&bottom_bar);
+
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("Moppler")
-        .child(&mb)
+        .title("Pidif")
+        .child(&app_wrapper)
         .build();
+    window.set_titlebar(Some(&header_bar));
+
+    open_file_button.connect_clicked(clone!(@weak window => move |_button| {
+        let filechooser = gtk4::FileChooserDialog::builder()
+            .title("Choose a PDF...")
+            .action(gtk4::FileChooserAction::Open)
+            .modal(true)
+            .build();
+        filechooser.add_button("_Cancel", gtk4::ResponseType::Cancel);
+        filechooser.add_button("_Open", gtk4::ResponseType::Accept);
+        filechooser.set_transient_for(Some(&window));
+        filechooser.connect_response(|d, response| {
+            if response == gtk4::ResponseType::Accept {
+                println!("yes!!! {}", &d.file().unwrap().path().unwrap().to_string_lossy() );
+               // video.set_file(Some(&d.file().unwrap()));
+            }
+            d.destroy();
+        });
+        filechooser.show()
+    }));
+
     let doc = PopplerDocument::new_from_file(filename, "").unwrap();
 
     let num_pages = doc.get_n_pages();
-
     let num_pages_ref = Rc::new(RefCell::new(num_pages));
 
     let current_page = Rc::new(RefCell::new(1));
-    let current_page_copy = current_page.clone();
     let current_page_copy_another = current_page.clone();
     let current_page_view = current_page.clone();
 
-    let pagewwidth = pagew.content_height();
-    let pagewheight = pagew.content_width();
-    println!(
-        "setting pagew width {} and height {}",
-        pagewwidth, pagewheight,
-    );
+    let drawing_areawidth = drawing_area.content_height();
+    let drawing_areaheight = drawing_area.content_width();
     let surface =
-        cairo::ImageSurface::create(cairo::Format::Rgb24, pagewwidth, pagewheight).unwrap();
+        cairo::ImageSurface::create(cairo::Format::Rgb24, drawing_areawidth, drawing_areaheight)
+            .unwrap();
     let ctx = Context::new(&surface).unwrap();
 
-    let update_page_status = clone!(@strong num_pages_ref, @strong page_indicator, @strong pagew => move || {
-           let page_status: String = format!("{} of {}", *current_page_copy_another.borrow_mut(), num_pages);
-           println!("trying to update indi to {}", page_status);
-           let page_status_s: &str = &page_status[..];
-           page_indicator.set_label(page_status_s);
-    // ctx.paint();
-    //     ctx.fill();
-    //     surface.flush();
-    //     // surface.finish();
-        pagew.queue_draw();
+    let update_page_status = clone!(@strong num_pages_ref, @strong page_indicator, @strong drawing_area => move || {
+        let page_status: String = format!("{} of {}", *current_page_copy_another.borrow_mut(), num_pages);
+        // println!("trying to update indi to {}", page_status);
+        let page_status_s: &str = &page_status[..];
+        page_indicator.set_label(page_status_s);
+        drawing_area.queue_draw();
         true
-       });
+    });
 
-    next_button.connect_clicked(clone!(@strong update_page_status => move |_| {
-        *current_page.borrow_mut() += 1;
-        update_page_status();
-    }));
-
-    back_button.connect_clicked(clone!(@strong update_page_status => move |_| {
-        println!("change page down from {}", *current_page_copy.borrow_mut());
-        *current_page_copy.borrow_mut() -= 1;
-        update_page_status();
-    }));
     update_page_status();
-    println!("Document has {} page(s)", num_pages);
+    // println!("Document has {} page(s)", num_pages);
 
-    // set_page_status();
+    let click = gtk4::GestureClick::new();
+    click.set_button(0);
+    click.connect_pressed(
+        glib::clone!(@weak drawing_area, @strong num_pages, @strong update_page_status => move |_count, _, x, y| {
+            // println!("clicked! {} {}", x, y);
+            // println!("window {}", drawing_area.width());
+            let center = drawing_area.width() / 2;
+            if y < (drawing_area.height() / 5) as f64 {
+            // println!("toggle fullscreen");
+                if header_bar.is_visible() {
+                    header_bar.hide();
+                    bottom_bar.hide();
+                } else {
+                    header_bar.show();
+                    bottom_bar.show();
+                }
+            } else if x > center as f64 &&  *current_page.borrow_mut() < num_pages {
+               *current_page.borrow_mut() += 1;
+            } else if x < center as f64 && *current_page.borrow_mut() > 1 {
+               *current_page.borrow_mut()  -= 1;
+            }
+            update_page_status();
 
-    // let surface = cairo::PdfSurfac::new(420.0, 595.0, "output.pdf").unwrap();
-    pagew.set_draw_func(move |_area, context, _a, _b| {
+        }),
+    );
+    drawing_area.add_controller(&click);
+
+    drawing_area.set_draw_func(move |area, context, _a, _b| {
         // let sur = surface.borrow();
         // Set the label to "Hello World!" after the button has been clicked on
         // let cr = cairo::Pattern::
         let current_page_number = &current_page_view.borrow_mut();
-        println!("current page is {} ", current_page_number);
-        println!("drawn");
+        // println!("current page is {} ", current_page_number);
         context.set_source_rgba(1.0, 1.0, 1.0, 1.0);
         context.paint().unwrap();
         context.fill().expect("uh oh");
@@ -150,30 +153,35 @@ fn build_ui(app: &Application, arguments: Vec<OsString>) {
         // context.save();
         context.paint().unwrap();
 
-        for page_num in 0..num_pages {
-            println!("{}", next_button.label().unwrap());
-            if page_num as i32 == **current_page_number - 1 {
-                let page = doc.get_page(page_num).unwrap();
-                let (w, h) = page.get_size();
-                println!("page {} has size {}, {}", page_num, w, h);
-                println!("sufrface has size {}, {}", pagewwidth, pagewheight);
-                // surface.set_size(w, h).unwrap();
-                context.save().unwrap();
-                context.scale(2.0, 2.0);
-                page.render(&context);
-
-                let r = ctx.paint();
-                match r {
-                    Err(v) => println!("error: {v:?}"),
-                    Ok(_v) => println!("Yay"),
-                }
-
-                // println!("Text: {:?}", page.get_text().unwrap_or(""));
-
-                // ctx.restore().unwrap();
-                ctx.show_page().unwrap();
-            }
+        //        for page_num in 0..num_pages {
+        //            println!("{}", next_button.label().unwrap());
+        //  if page_num as i32 == **current_page_number - 1 {
+        let page = doc.get_page(**current_page_number - 1).unwrap();
+        let (w, h) = page.get_size();
+        // println!("page has size {}, {}", w, h);
+        // println!("sufrface has size {}, {}", area.width(), area.height(),);
+        let width_diff = area.width() as f64 / w;
+        let height_diff = area.height() as f64 / h;
+        context.save().unwrap();
+        if width_diff > height_diff {
+            context.scale(height_diff, height_diff);
+        } else {
+            context.scale(width_diff, width_diff);
         }
+        page.render(&context);
+
+        let r = ctx.paint();
+        match r {
+            Err(v) => println!("error: {v:?}"),
+            Ok(_v) => println!("Yay"),
+        }
+
+        // println!("Text: {:?}", page.get_text().unwrap_or(""));
+
+        // ctx.restore().unwrap();
+        ctx.show_page().unwrap();
+        //          }
+        // }
     });
 
     // FIXME: move iterator to poppler
