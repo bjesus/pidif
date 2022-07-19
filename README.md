@@ -1,4 +1,6 @@
-![pidif](https://user-images.githubusercontent.com/55081/179420332-6b64ab77-3de0-42e3-816a-ed640d3fca5e.png)
+<p align="center"> <img alt="pidif screenshot" src="https://user-images.githubusercontent.com/55081/179860375-486574a8-cc29-4126-bd69-d304ea27acae.png" /></p>
+
+
 
 # Pidif PDF Viewer
 
@@ -10,8 +12,14 @@ To maintain a clean UI, Pidif comes only with an "open file" button. Navigating 
 
 ## Installation
 
+### Distribution packages
+
+- Arch Linux: [pidif](https://aur.archlinux.org/packages/pidif) <sup>AUR</sup>
+- Alpine Linux ( & PostmarketOS): [pidif](https://pkgs.alpinelinux.org/packages?name=pidif&branch=edge&repo=&arch=x86_64&maintainer=) <sup>testing</sup>
+
+
 ### Compiling manually
 
-- Install the dev packages of libgtk-4, libcairo, and libpoppler.
+- Install the dev packages of `gtk-4`, `cairo`, and `poppler`.
 - `git clone` the repository
 - Run `cargo build --release`
