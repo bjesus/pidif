@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Pidif
+Type=Application
+Terminal=false
+Categories=Office;
+Icon=x-office-document
+Exec=pidif
+MimeType=application/pdf;
